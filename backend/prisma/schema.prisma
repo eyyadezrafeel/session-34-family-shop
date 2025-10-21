@@ -1,0 +1,68 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+model User {
+  id         Int       @id @default(autoincrement())
+  name       String
+  email      String    @unique
+  password   String
+  familyId   Int?
+  family     Family?   @relation(fields: [familyId], references: [id])
+  items      Item[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+
+model Family {
+  id            Int            @id @default(autoincrement())
+  name          String
+  code          String          @unique      // join code like FAM-392A
+  inviteLink    String?                        // optional invite URL
+  users         User[]
+  shoppingLists ShoppingList[]
+  createdAt     DateTime        @default(now())
+}
+
+
+model ShoppingList {
+  id          Int        @id @default(autoincrement())
+  weekStart   DateTime
+  weekEnd     DateTime
+  archived    Boolean     @default(false)
+  familyId    Int
+  family      Family      @relation(fields: [familyId], references: [id])
+  items       Item[]
+  createdAt   DateTime    @default(now())
+}
+
+
+model Item {
+  id             Int           @id @default(autoincrement())
+  name           String
+  addedById      Int
+  addedBy        User           @relation(fields: [addedById], references: [id])
+  shoppingListId Int
+  shoppingList   ShoppingList   @relation(fields: [shoppingListId], references: [id])
+  status         ItemStatus     @default(PENDING)
+  createdAt      DateTime       @default(now())
+}
+
+enum ItemStatus {
+  PENDING
+  INCLUDED
+  SKIPPED
+}
