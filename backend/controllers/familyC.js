@@ -8,7 +8,7 @@ export const createFamily = async (req,res) => {
     const userId = req.user.id
     try{
         const code = "FAM-"+randomBytes(3).toString("hex").toUpperCase();
-        const inviteLink = `http://localhost:3000/join/${code}`;
+        const inviteLink = `http://localhost:4000/join/${code}`;
 
         const family = await prisma.family.create({
             data:{

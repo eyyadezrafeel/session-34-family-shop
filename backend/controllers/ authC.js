@@ -7,8 +7,8 @@ const prisma = new PrismaClient();
 export const registerUser = async (req,res) => {
     const {name,email,password} = req.body;
     try{
-        const existing = await prisma.user.findUnique({ where:{email}});
-if (!existing) return res.status(400).json({massage:"User already exists"});
+        const existing = await prisma.user.findMany({ where:{email}});
+if (!existing) {return res.status(400).json({massage:"User already exists"})};
 
 const hashedPassword = await bcrypt.hash(password,10);
 const user = await prisma.user.create({
@@ -25,7 +25,7 @@ res.status(201).json({token,user:{id:user.id,name,email}});
 };
 
 export const loginUser = async (req,res)=>{
-const {name,email,password} = req.body;
+const {email,password} = req.body;
 try{
 const user = await prisma.user.findUnique({where:{email}});
 if(!user) return res.status(400).json({massage:"Invalid credentials"});
