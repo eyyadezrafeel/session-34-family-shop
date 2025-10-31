@@ -9,56 +9,50 @@ on:
       - master
 
 jobs:
-  backend-build:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 10  # prevent infinite runs
 
     steps:
-      # 1️⃣ Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js (use Node 20 to match your packages)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 18
 
-      # 3️⃣ Install dependencies
-      - name: Install backend dependencies
+      - name: Install dependencies
         run: |
           cd backend
+          npm install -g pm2
           npm install
-          npm install -g wait-on
-          cd ..
 
-      # 4️⃣ Start backend for tests with secrets
-      - name: Start backend and run tests
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      # Start backend with PM2
+      - name: Start backend
         run: |
           cd backend
-          # Start backend in background
-          node index.js &
-          PID=$!
-          # Wait until backend is ready
-          npx wait-on http://localhost:4000/status
-          # Run backend tests
-          npm test
-          # Stop backend after tests
-          kill $PID
-          cd ..
-
-      # 5️⃣ Optional: Check /status endpoint
-      - name: Test /status endpoint
+          pm2 start index.js --name backend
+          pm2 list
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
+      # Wait a few seconds for backend to fully start
+      - name: Wait for backend
+        run: sleep 5
+
+      # Run backend tests
+      - name: Run backend tests
         run: |
-          RESPONSE=$(curl -s http://localhost:4000/status || echo "FAILED")
+          cd backend
+          npm test
+
+      # Check backend status endpoint
+      - name: Test /status endpoint
+        run: |
+          RESPONSE=$(curl -s http://localhost:4000/status)
           echo "Response: $RESPONSE"
           if [[ "$RESPONSE" != *"OK"* ]]; then
             echo "Backend status check failed!"
