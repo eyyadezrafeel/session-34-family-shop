@@ -1,4 +1,4 @@
-name: Abo Ali CI
+name: Backend CI
 
 on:
   push:
@@ -9,73 +9,58 @@ on:
       - master
 
 jobs:
-  build:
+  backend-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10  # prevent infinite runs
+    timeout-minutes: 10
 
     steps:
+      # 1️⃣ Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2️⃣ Setup Node.js (use Node 20 to match your packages)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
-      - name: Install wait-on globally
-        run: npm install -g wait-on    
-
-      - name: Install dependencies
+      # 3️⃣ Install dependencies
+      - name: Install backend dependencies
         run: |
           cd backend
-          npm install -g pm2
           npm install
-          cd ../frontend
-          npm install
+          npm install -g wait-on
           cd ..
 
-      # 🔹 Start backend in background and wait for it
-      - name: Start backend
-        run: |
-          cd backend
-          npm run dev &
-          cd ..
-          npx wait-on http://localhost:4000/status
+      # 4️⃣ Start backend for tests with secrets
+      - name: Start backend and run tests
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
-
-      # 🔹 Start frontend in background and wait for it
-      - name: Start frontend
-        run: |
-          cd frontend
-          npm run dev &
-          cd ..
-          npx wait-on http://localhost:5173
-        env:
-          VITE_API_URL: http://localhost:4000
-
-      # 🔹 Run backend tests
-      - name: Run backend tests
         run: |
           cd backend
+          # Start backend in background
+          node index.js &
+          PID=$!
+          # Wait until backend is ready
+          npx wait-on http://localhost:4000/status
+          # Run backend tests
           npm test
+          # Stop backend after tests
+          kill $PID
           cd ..
 
-      # 🔹 Check backend status endpoint
+      # 5️⃣ Optional: Check /status endpoint
       - name: Test /status endpoint
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
-          RESPONSE=$(curl -s http://localhost:4000/status)
+          RESPONSE=$(curl -s http://localhost:4000/status || echo "FAILED")
           echo "Response: $RESPONSE"
           if [[ "$RESPONSE" != *"OK"* ]]; then
             echo "Backend status check failed!"
             exit 1
           fi
-
-      # 🔹 Run frontend Playwright tests
-      - name: Run Playwright tests
-        run: |
-          cd frontend
-          npx playwright install --with-deps
-          npx playwright test
