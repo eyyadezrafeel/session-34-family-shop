@@ -7,11 +7,11 @@ on:
   pull_request:
     branches:
       - master
-      
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10  # prevent infinite runs
 
     steps:
       - name: Checkout repository
@@ -31,34 +31,36 @@ jobs:
           npm install
           cd ..
 
+      # 🔹 Start backend in background and wait for it
       - name: Start backend
         run: |
           cd backend
-          pm2 start npm --name backend -- run dev
+          npm run dev &
+          cd ..
+          npx wait-on http://localhost:4000/status
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
-      - name: Wait for backend
-        run: npx wait-on http://localhost:4000/status
-
+      # 🔹 Start frontend in background and wait for it
       - name: Start frontend
         run: |
           cd frontend
           npm run dev &
+          cd ..
+          npx wait-on http://localhost:5173
         env:
           VITE_API_URL: http://localhost:4000
 
-      - name: Wait for frontend
-        run: npx wait-on http://localhost:5173
-
+      # 🔹 Run backend tests
       - name: Run backend tests
         run: |
           cd backend
           npm test
           cd ..
 
+      # 🔹 Check backend status endpoint
       - name: Test /status endpoint
         run: |
           RESPONSE=$(curl -s http://localhost:4000/status)
@@ -68,6 +70,7 @@ jobs:
             exit 1
           fi
 
+      # 🔹 Run frontend Playwright tests
       - name: Run Playwright tests
         run: |
           cd frontend
