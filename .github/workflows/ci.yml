@@ -1,0 +1,72 @@
+name: Abo Ali CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feature
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          npm install -g pm2
+          npm install
+          cd ../frontend
+          npm install
+          cd ..
+
+      - name: Start backend
+        run: |
+          cd backend
+          pm2 start npm --name backend -- run dev
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
+      - name: Wait for backend
+        run: npx wait-on http://localhost:4000/status
+
+      - name: Start frontend
+        run: |
+          cd frontend
+          npm run dev &
+        env:
+          VITE_API_URL: http://localhost:4000
+
+      - name: Wait for frontend
+        run: npx wait-on http://localhost:5173
+
+      - name: Run backend tests
+        run: |
+          cd backend
+          npm test
+          cd ..
+
+      - name: Test /status endpoint
+        run: |
+          RESPONSE=$(curl -s http://localhost:4000/status)
+          echo "Response: $RESPONSE"
+          if [[ "$RESPONSE" != *"OK"* ]]; then
+            echo "Backend status check failed!"
+            exit 1
+          fi
+
+      - name: Run Playwright tests
+        run: |
+          cd frontend
+          npx playwright install --with-deps
+          npx playwright test
