@@ -19,7 +19,7 @@ app.use(helmet());
 const PORT = process.env.PORT || 4000;
 
 app.get('/status',(req , res) =>{
-    res.status(200)
+    res.send("OK");
 } )
 
 app.use('/api/auth',authRouter);
